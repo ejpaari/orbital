@@ -5,12 +5,6 @@ using System.IO;
 
 public class Router : MonoBehaviour 
 {
-	private struct Route
-	{
-		public Mathd.Vector3d start;
-		public Mathd.Vector3d end;
-	};
-
 	public struct Node
 	{
 		public int id;
@@ -19,11 +13,11 @@ public class Router : MonoBehaviour
 
 	private const double EARTH_RADIUS = 6371.0;
 
-	private Route route = new Route();
 	private List<Mathd.Vector3d> satellites = new List<Mathd.Vector3d>();
+	private List<Mathd.Vector3d> routes = new List<Mathd.Vector3d>();
 	private List<Node> graph = new List<Node>();
-	private int startSat = -1;
-	private int endSat = -1;
+	private List<int> startSats = new List<int>();
+	private List<int> endSats = new List<int>();
 	private Visualizer visualizer;
 
 	private void CreateGraph()
@@ -34,31 +28,55 @@ public class Router : MonoBehaviour
 			node.nodes = new List<int>();
 			node.id = i;
 			for (int j = 0; j < satellites.Count; ++j) {
-				if (!Mathd.LineSphereIntersection(satellites[i], satellites[j], origo, EARTH_RADIUS)) {
+				if (i != j && !Mathd.LineSphereIntersection(satellites[i], satellites[j], origo, EARTH_RADIUS)) {
 					node.nodes.Add(j);
 				}
 			}
 			graph.Add(node);
+
+			if (!Mathd.LineSphereIntersection(routes[0], satellites[i], origo, EARTH_RADIUS)) {
+				startSats.Add(i);
+			}
+			if (!Mathd.LineSphereIntersection(routes[1], satellites[i], origo, EARTH_RADIUS)) {
+				endSats.Add(i);
+			}
 		}
 	}
 
-	private void FindNearestSatellites()
+	private bool FindShortestPath(int start, List<int> endSats, ref List<int> path)
 	{
-		double startDistance = double.MaxValue;
-		double endDistance = double.MaxValue;
-		double dist;
-		for (int i = 0; i < satellites.Count; ++i) {
-			dist = Mathd.SquaredDistance(satellites[i], route.start);
-			if (dist < startDistance) {
-				startDistance = dist;
-				startSat = i;
-			}
-			dist = Mathd.SquaredDistance(satellites[i], route.end);
-			if (dist < endDistance) {
-				endDistance = dist;
-				endSat = i;
-			}
+		if (start < 0 || start >= graph.Count || endSats.Count == 0) {
+			return false;
 		}
+
+		List<bool> visited = new List<bool>();
+		for (int i = 0; i < graph.Count; ++i) {
+			visited.Add(false);
+		}
+
+		List<List<int>> paths = new List<List<int>>();
+		List<int> startPath = new List<int>();
+		startPath.Add(start);
+		paths.Add(startPath);
+
+		while (paths.Count > 0) {
+			List<int> currentPath = new List<int>(paths[0]);
+			int id = currentPath[currentPath.Count - 1];
+			visited[id] = true;
+			foreach (int i in graph[id].nodes) {
+				if (!visited[i]) {
+					List<int> newPath = new List<int>(currentPath);
+					newPath.Add(i);
+					if (endSats.Contains(i)) {
+						path = newPath;
+						return true;
+					}
+					paths.Add(newPath);
+				}
+			}
+			paths.RemoveAt(0);
+		}
+		return false;
 	}
 
 	void Start() 
@@ -78,26 +96,40 @@ public class Router : MonoBehaviour
 				satellites.Add(Mathd.ToCartesian(p));
 			}
 			if (values[0].Contains("ROUTE")) {
-				route.start.x = System.Convert.ToDouble(values[1]);
-				route.start.y = System.Convert.ToDouble(values[2]);
-				route.start.z = EARTH_RADIUS;
-				route.start = Mathd.ToCartesian(route.start);
-				route.end.x = System.Convert.ToDouble(values[3]);
-				route.end.y = System.Convert.ToDouble(values[4]);
-				route.end.z = EARTH_RADIUS;
-				route.end = Mathd.ToCartesian(route.end);
+				Mathd.Vector3d s;
+				s.x = System.Convert.ToDouble(values[1]);
+				s.y = System.Convert.ToDouble(values[2]);
+				s.z = EARTH_RADIUS + 0.1;
+				routes.Add(Mathd.ToCartesian(s));
+
+				Mathd.Vector3d e;
+				e.x = System.Convert.ToDouble(values[3]);
+				e.y = System.Convert.ToDouble(values[4]);
+				e.z = EARTH_RADIUS + 0.1;
+				routes.Add(Mathd.ToCartesian(e));
 			}
 		}
 
 		CreateGraph();
-		FindNearestSatellites();
+
+		List<int> shortestPath = new List<int>();
+		foreach (int sat in startSats) {
+			List<int> temp = new List<int>();
+			if (FindShortestPath(sat, endSats, ref temp)) {
+				if (shortestPath.Count == 0 || temp.Count < shortestPath.Count) {
+					shortestPath = temp;
+				}
+			}
+		}
+
+		string text = "";
+		foreach (int i in shortestPath) {
+			text += "SAT" + i.ToString() + ",";
+		}
+		text = text.Remove(text.Length - 1);
+		File.WriteAllText("out", text);
 
 		visualizer = GetComponent<Visualizer>();
-		visualizer.Visualize(satellites, graph);
-	}
-
-	public List<Mathd.Vector3d> Satellites
-	{
-		get { return satellites; }
+		visualizer.Visualize(satellites, graph, routes);
 	}
 }
