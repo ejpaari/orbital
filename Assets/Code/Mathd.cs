@@ -72,8 +72,8 @@ public static class Mathd
 		return Math.Sqrt(SquaredDistance(a, b));
 	}
 
-	public static bool LineSphereIntersection(Vector3d start, Vector3d end, Vector3d origo, double r) 
-	{
+	public static bool RaySphereIntersection(Vector3d start, Vector3d end, Vector3d origo, double r) 
+	{		
 		Vector3d L = origo - start;
 		Vector3d dir = (end - start);
 		dir.Normalize();

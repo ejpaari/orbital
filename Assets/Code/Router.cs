@@ -28,16 +28,16 @@ public class Router : MonoBehaviour
 			node.nodes = new List<int>();
 			node.id = i;
 			for (int j = 0; j < satellites.Count; ++j) {
-				if (i != j && !Mathd.LineSphereIntersection(satellites[i], satellites[j], origo, EARTH_RADIUS)) {
+				if (i != j && !Mathd.RaySphereIntersection(satellites[i], satellites[j], origo, EARTH_RADIUS)) {
 					node.nodes.Add(j);
 				}
 			}
 			graph.Add(node);
 
-			if (!Mathd.LineSphereIntersection(routes[0], satellites[i], origo, EARTH_RADIUS)) {
+			if (!Mathd.RaySphereIntersection(routes[0], satellites[i], origo, EARTH_RADIUS)) {
 				startSats.Add(i);
 			}
-			if (!Mathd.LineSphereIntersection(routes[1], satellites[i], origo, EARTH_RADIUS)) {
+			if (!Mathd.RaySphereIntersection(routes[1], satellites[i], origo, EARTH_RADIUS)) {
 				endSats.Add(i);
 			}
 		}
@@ -126,10 +126,12 @@ public class Router : MonoBehaviour
 		foreach (int i in shortestPath) {
 			text += "SAT" + i.ToString() + ",";
 		}
-		text = text.Remove(text.Length - 1);
+		text = text.Length > 0 ? text.Remove(text.Length - 1) : "";
 		File.WriteAllText("out", text);
 
-		visualizer = GetComponent<Visualizer>();
-		visualizer.Visualize(satellites, graph, routes);
+		if (shortestPath.Count > 0) {
+			visualizer = GetComponent<Visualizer> ();
+			visualizer.Visualize (satellites, graph, routes, shortestPath);
+		}
 	}
 }
